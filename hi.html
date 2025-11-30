@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pure Air: Breathe Clean, Live Green</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-green': '#10B981', // Emerald 500
+                        'secondary-green': '#34D399', // Emerald 400
+                        'dark-bg': '#F8FAF5', // Light off-white/greenish tint
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        /* Base styles for the app container */
+        .container {
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body class="bg-dark-bg font-sans antialiased">
+
+    <!-- Main Application Container -->
+    <div id="app" class="container max-w-lg mx-auto p-4 flex flex-col gap-6">
+
+        <!-- Header -->
+        <header class="text-center py-6 bg-white rounded-xl shadow-lg">
+            <h1 class="text-3xl font-bold text-primary-green flex items-center justify-center">
+                <!-- Leaf Icon (Inline SVG for simplicity) -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+                    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 20.3 7 22 8.5" />
+                    <path d="M2.5 17.5c1.6 1.6 3.6 2.5 5.5 2.5 5 0 9.1-3.6 11.2-8.5.2-.6.4-1.2.6-1.8.8-.4 1.5-1 2-1.7-.2-1.1-1.3-2-2.5-2.5-.2-1.1-1-2.1-2-2.5-1.1-.4-2.2-.4-3.3 0-3.3 1.2-6.2 3.8-8 7.3C6.3 12.8 4.2 13.9 2 15.1" />
+                </svg>
+                Pure Air
+            </h1>
+            <p class="text-gray-500 mt-1 text-sm italic">Breathe Clean, Live Green</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="bg-white p-5 rounded-xl shadow-lg">
+            <label for="queryInput" class="block text-md font-medium text-gray-700 mb-2">Check Air Quality & Get Green Tips</label>
+            <textarea id="queryInput" rows="2" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-primary-green focus:ring focus:ring-secondary-green focus:ring-opacity-50 transition resize-none" placeholder="e.g., Air quality in Tokyo today, or What is PM2.5?"></textarea>
+            <button id="analyzeButton" onclick="handleAnalysis()" class="mt-4 w-full bg-primary-green text-white py-3 rounded-xl font-semibold shadow-md hover:bg-secondary-green transition duration-200 focus:outline-none focus:ring-4 focus:ring-primary-green focus:ring-opacity-50 active:scale-[0.98]">
+                Analyze & Act
+            </button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden text-center mt-6">
+            <div class="flex items-center justify-center space-x-2">
+                <div class="w-4 h-4 rounded-full bg-primary-green animate-bounce delay-75"></div>
+                <div class="w-4 h-4 rounded-full bg-primary-green animate-bounce delay-150"></div>
+                <div class="w-4 h-4 rounded-full bg-primary-green animate-bounce delay-300"></div>
+            </div>
+            <p class="text-gray-600 mt-2">Fetching real-time data and generating plan...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsContainer" class="hidden bg-white p-5 rounded-xl shadow-lg border-t-4 border-primary-green transition-all duration-300">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Pure Air Report</h2>
+            <div id="reportContent" class="text-gray-700 leading-relaxed space-y-4">
+                <!-- Content will be injected here -->
+            </div>
+            
+            <!-- Grounding Sources -->
+            <div id="sourcesContainer" class="mt-6 border-t pt-4">
+                <p class="font-medium text-sm text-gray-600 mb-2">Sources:</p>
+                <ul id="sourcesList" class="text-xs space-y-1 text-blue-600">
+                    <!-- Sources will be injected here -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Error Message (Custom Modal-like display) -->
+        <div id="errorBox" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-2xl max-w-xs w-full" role="alert">
+                <p class="font-bold">Error Processing Request</p>
+                <p id="errorMessage" class="text-sm mt-1">Please try a different query or check your connection.</p>
+                <button onclick="document.getElementById('errorBox').classList.add('hidden')" class="mt-3 text-sm font-semibold text-red-500 hover:text-red-800">Dismiss</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // --- API KEY CONFIGURATION ---
+        // CRITICAL FIX: The user's API key is now hardcoded here for guaranteed functionality
+        // when running on a local Android server.
+        const MANUAL_API_KEY = "AIzaSyAH-WCbYrFfNBmVsUyPG8bXqZMGkjQpoUk"; 
+        
+        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+        
+        // Function to determine the API URL based on the environment
+        const getApiUrl = () => {
+            // Priority 1: Use the manually inserted key (guarantees success on local server)
+            if (MANUAL_API_KEY && MANUAL_API_KEY.startsWith("AIzaSy")) {
+                return `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${MANUAL_API_KEY}`;
+            }
+
+            // Fallback (for running back in the Canvas environment)
+            if (typeof __api_key !== 'undefined' && __api_key) {
+                return `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${__api_key}`;
+            }
+            
+            // Final fallback to prevent a crash
+            return `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=`; 
+        };
+
+        const API_URL = getApiUrl();
+
+
+        // DOM Elements
+        const queryInput = document.getElementById('queryInput');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const reportContent = document.getElementById('reportContent');
+        const sourcesList = document.getElementById('sourcesList');
+        const sourcesContainer = document.getElementById('sourcesContainer');
+        const errorBox = document.getElementById('errorBox');
+        const errorMessage = document.getElementById('errorMessage');
+
+        /**
+         * System Instruction to guide the LLM's response.
+         */
+        const systemPrompt = `You are an AI Eco-Consultant specializing in air quality and sustainable living. Your primary goal is to help the user "Breathe Clean and Live Green."
+            Analyze the user's query or the factual information found via Google Search grounding.
+            
+            Provide a clear, two-part response formatted using Markdown headings (##) for structure:
+            
+            1.  ## Air Quality Snapshot: (A concise summary of the current air quality situation or the technical definition of the pollutant, citing the location/source if found in the search results. Use standard text/Unicode for formulas, e.g., 'PM2.5' instead of $\text{PM}_{2.5}$).
+            2.  ## Live Green Action Plan: (3 specific, actionable steps a person can take *right now* to breathe cleaner or reduce their local environmental impact, tailored to the context if possible).
+            
+            Maintain an encouraging, informative, and professional tone. IMPORTANT: Do not use LaTeX math delimiters ($$) in your response.`;
+
+        /**
+         * Retries a fetch request with exponential backoff.
+         * @param {function} fn - The function to retry (e.g., fetch call).
+         * @param {number} maxRetries - Maximum number of retries.
+         */
+        const fetchWithRetry = async (fn, maxRetries = 3) => {
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    attempt++;
+                    if (attempt >= maxRetries) throw error;
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    // Exponential backoff logic
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        };
+
+        /**
+         * Converts Markdown output to HTML for display.
+         */
+        const renderMarkdown = (markdown) => {
+            // Clean up any remaining LaTeX math delimiters
+            markdown = markdown.replace(/\$\$.*?\$\$/g, '').replace(/\$.*?\$/g, '');
+
+            // Convert headings (##) to h3 for styling
+            let html = markdown.replace(/^##\s*(.*)$/gm, '<h3 class="text-xl font-bold text-primary-green mb-2 mt-4">$1</h3>');
+            
+            // Convert paragraphs/lists
+            html = html.split('\n').map(line => {
+                if (line.trim().length > 0 && !line.startsWith('<h3')) {
+                    // Convert simple lists (starts with *, +, or -) to ul/li
+                    if (line.match(/^[\*\+\-]\s/)) {
+                        return `<li class="ml-4 list-disc text-gray-700">${line.substring(line.indexOf(' ') + 1)}</li>`;
+                    }
+                    return `<p class="mb-3">${line}</p>`;
+                }
+                return line;
+            }).join('');
+            
+            // Basic list wrapping cleanup
+            let listStarted = false;
+            let finalHtml = html.split('\n').map(line => {
+                if (line.trim().startsWith('<li')) {
+                    if (!listStarted) {
+                        listStarted = true;
+                        return '<ul>' + line;
+                    }
+                    return line;
+                } else {
+                    if (listStarted) {
+                        listStarted = false;
+                        return '</ul>' + line;
+                    }
+                    return line;
+                }
+            }).join('\n');
+            
+            if (listStarted) finalHtml += '</ul>'; 
+
+            return finalHtml;
+        };
+        
+
+        /**
+         * Main function to handle the API call and UI update.
+         */
+        window.handleAnalysis = async () => {
+            const userQuery = queryInput.value.trim();
+
+            if (!userQuery) {
+                errorMessage.textContent = "Please enter a location (e.g., 'Air quality in London') or a pollutant (e.g., 'What is PM10?').";
+                errorBox.classList.remove('hidden');
+                return;
+            }
+
+            // UI State: Disable button, show loading, hide results
+            analyzeButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            reportContent.innerHTML = '';
+            sourcesList.innerHTML = '';
+            sourcesContainer.classList.add('hidden'); 
+            errorBox.classList.add('hidden');
+
+            // --- CRITICAL CHECK FOR KEY ---
+            // This check should now only fail if the user manually deletes the key.
+            if (API_URL.endsWith('key=')) {
+                errorMessage.textContent = "API Key Error: The API key is missing. Please ensure the MANUAL_API_KEY variable is set in the code.";
+                errorBox.classList.remove('hidden');
+                analyzeButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+                return;
+            }
+            // --- END CRITICAL CHECK ---
+
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                // Use Google Search grounding for real-time data
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            try {
+                const response = await fetchWithRetry(() => fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }));
+                
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                    // Check for common API errors in the response structure
+                    if (result.error && result.error.message) {
+                        throw new Error(`API returned an error: ${result.error.message}`);
+                    }
+                    throw new Error("Received an empty or malformed response from the AI. This usually indicates a network timeout or an invalid API key.");
+                }
+
+                // 1. Extract the generated text and clean/render it
+                const markdownText = candidate.content.parts[0].text;
+                reportContent.innerHTML = renderMarkdown(markdownText);
+                
+                // 2. Extract and display grounding sources
+                let sources = [];
+                const groundingMetadata = candidate.groundingMetadata;
+                if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                    sources = groundingMetadata.groundingAttributions
+                        .map(attribution => ({
+                            uri: attribution.web?.uri,
+                            title: attribution.web?.title,
+                        }))
+                        .filter(source => source.uri && source.title);
+                }
+
+                if (sources.length > 0) {
+                    sourcesList.innerHTML = sources.map(source => 
+                        `<li><a href="${source.uri}" target="_blank" class="hover:underline transition">${source.title || source.uri}</a></li>`
+                    ).join('');
+                    sourcesContainer.classList.remove('hidden');
+                } else {
+                    sourcesContainer.classList.add('hidden');
+                }
+
+                resultsContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                // Enhanced error message for the user
+                errorMessage.textContent = `Analysis failed: ${error.message.includes('API returned an error') ? error.message : 'Please check your internet connection or the API key status.'}`;
+                errorBox.classList.remove('hidden');
+            } finally {
+                // UI State: Reset
+                analyzeButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        };
+
+        // Initialize the app display state
+        window.onload = () => {
+             // Example initialization or prompt guidance if needed
+        };
+    </script>
+
+</body>
+</html>
+
+
